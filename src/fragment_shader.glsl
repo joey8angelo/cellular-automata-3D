@@ -11,7 +11,28 @@ uniform mat4 projection;
 uniform usampler3D voxelData;
 uniform vec3 voxelSize;
 
+uniform vec3 c0;
+uniform vec3 c1;
+uniform vec3 c2;
+uniform vec3 c3;
+uniform vec3 c4;
+uniform vec3 c5;
+uniform bool gradInverted;
+
 const int MAX_STEPS = 512;
+
+vec3 grad(float t) {
+    if (gradInverted) {
+        t = 1.0 - t;
+    }
+    if (t <= 0.0) return c0;
+    else if (t >= 1.0) return c5;
+    else if (t < 0.2) return mix(c0, c1, t / 0.2);
+    else if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
+    else if (t < 0.6) return mix(c2, c3, (t - 0.4) / 0.2);
+    else if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
+    else return mix(c4, c5, (t - 0.8) / 0.2);
+}
 
 float ray_aabb(vec3 bmin, vec3 bmax, vec3 o, vec3 d) {
     float tmin = 0;
@@ -39,66 +60,48 @@ vec3 traverse(vec3 o, vec3 d) {
     vec3 gridMax = voxelSize;
     float entryT = ray_aabb(gridMin, gridMax, o, d);
     if (entryT == 1e30f) {
-        return vec3(0.0);
+        return vec3(0.0, 0.0, 0.0);
     }
 
-    vec3 entryPos = o + d * (entryT + 0.0001f);
+    vec3 entryPos = o + d * (entryT + 0.0001);
     
     vec3 step = sign(d);
-    vec3 delta = abs(1.0f / d);
+    vec3 delta = abs(1.0 / d);
 
-    // clamp entry point inside the grid
-    vec3 pos = clamp(floor(entryPos), gridMin, gridMax - vec3(1.0f));
+    vec3 pos = floor(entryPos);
     
-    vec3 tmax = (pos - entryPos + max(step, vec3(0.0))) / d;
+    vec3 tmax = (pos + max(step, vec3(0.0)) - entryPos) / d;
     
     int axis = 0;
     for (int steps = 0; steps < MAX_STEPS; steps++) {
-        uint voxelValue = texelFetch(voxelData, ivec3(pos), 0).r;
+        // check bounds before reading texture
+        if (pos.x >= 0.0 && pos.x < voxelSize.x &&
+            pos.y >= 0.0 && pos.y < voxelSize.y &&
+            pos.z >= 0.0 && pos.z < voxelSize.z) {
+            
+            uint voxelValue = texelFetch(voxelData, ivec3(pos), 0).r;
 
-        if(voxelValue != 0u) {
-            float t = entryT + (tmax[axis] - delta[axis]);
-            // depth coloring with purple tint
-            float depth = t - entryT;
-            return vec3(10 / (depth)) + vec3(0.05, 0.0, 0.1);
+            if(voxelValue != 0u) {
+                float t = float(steps) / voxelSize[axis];
+                return grad(clamp(t, 0.1, 1.0));
+            }
         }
         
-        if (tmax.x < tmax.y) {
-            if (tmax.x < tmax.z) {
-                pos.x += step.x;
-                if (pos.x < 0 || pos.x >= voxelSize.x) {
-                    break;
-                }
-                axis = 0;
-                tmax.x += delta.x;
-            } else {
-                pos.z += step.z;
-                if (pos.z < 0 || pos.z >= voxelSize.z) {
-                    break;
-                }
-                axis = 2;
-                tmax.z += delta.z;
-            }
-        } else {
-            if (tmax.y < tmax.z) {
-                pos.y += step.y;
-                if (pos.y < 0 || pos.y >= voxelSize.y) {
-                    break;
-                }
-                axis = 1;
-                tmax.y += delta.y;
-            } else {
-                pos.z += step.z;
-                if (pos.z < 0 || pos.z >= voxelSize.z) {
-                    break;
-                }
-                axis = 2;
-                tmax.z += delta.z;
-            }
+        // get next voxel
+        axis = 0;
+        if (tmax.y < tmax.x) axis = 1;
+        if (tmax.z < tmax[axis]) axis = 2;
+        
+        pos[axis] += step[axis];
+        tmax[axis] += delta[axis];
+        
+        // exit if outside the grid
+        if (pos[axis] < 0.0 || pos[axis] >= voxelSize[axis]) {
+            return vec3(0.0, 0.0, 0.0);
         }
     }
 
-    return vec3(0.0);
+    return vec3(0.0, 0.0, 0.0);
 }
 
 Ray getRay() {

@@ -10,15 +10,17 @@ const float pr = 0.499f;
 class CellularAutomaton {
  private:
   const char* computePath;
-  ComputeShader cs;
   GLuint textures[2];
   GLuint buffer;
   short read, write;
   glm::ivec3 size;
 
  public:
+  ComputeShader computeShader;
   CellularAutomaton(const glm::ivec3& size)
-      : computePath("../src/compute.glsl"), cs(computePath), size(size) {
+      : computePath("../src/compute.glsl"),
+        size(size),
+        computeShader(computePath) {
     initTextures();
   }
 
@@ -51,7 +53,7 @@ class CellularAutomaton {
   }
 
   void update() {
-    cs.use();
+    computeShader.use();
 
     glBindImageTexture(0, textures[write], 0, GL_TRUE, 0, GL_WRITE_ONLY,
                        GL_R8UI);

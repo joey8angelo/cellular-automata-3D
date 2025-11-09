@@ -4,6 +4,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 layout (binding = 0, r8ui) uniform uimage3D writeTex;
 layout (binding = 1, r8ui) uniform uimage3D readTex;
+uniform bool wrapEdges;
 
 uint countNeighbors(ivec3 pos) {
     uint count = 0;
@@ -14,9 +15,19 @@ uint countNeighbors(ivec3 pos) {
                 if (x == 0 && y == 0 && z == 0) continue;
                 ivec3 neighborPos = pos + ivec3(x, y, z);
 
-                if (neighborPos.x < 0 || neighborPos.y < 0 || neighborPos.z < 0 ||
-                    neighborPos.x >= size.x || neighborPos.y >= size.y || neighborPos.z >= size.z) {
-                    continue;
+                if (wrapEdges) {
+                    neighborPos.x = (neighborPos.x + size.x) % size.x;
+                    neighborPos.y = (neighborPos.y + size.y) % size.y;
+                    neighborPos.z = (neighborPos.z + size.z) % size.z;
+                } else {
+                    if (neighborPos.x < 0 || 
+                        neighborPos.y < 0 || 
+                        neighborPos.z < 0 ||
+                        neighborPos.x >= size.x || 
+                        neighborPos.y >= size.y || 
+                        neighborPos.z >= size.z) {
+                        continue;
+                    }
                 }
 
                 count += imageLoad(readTex, neighborPos).r;

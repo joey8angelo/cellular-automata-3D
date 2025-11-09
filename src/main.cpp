@@ -11,10 +11,7 @@
 
 #include <functional>
 
-// Update the cellular automaton 20 times per second
-const double updateLim = 1.0 / 20.0;
-
-glm::ivec3 grid(256, 256, 64);
+glm::ivec3 grid(256, 256, 256);
 glm::ivec3 pgrid = grid;
 
 Camera camera({-grid.x * 1.5, grid.y * 1.5, grid.z * 1.5}, {0.0, 1.0, 0.0}, 0.0,
@@ -120,6 +117,8 @@ int main() {
   GLFWwindow* window = initGLFWGlad();
   initImGui(window);
 
+  float simSpeed = 20;
+
   Shader shader("../src/vertex_shader.glsl", "../src/fragment_shader.glsl");
   shader.use();
   shader.setVec3("voxelSize", grid);
@@ -151,13 +150,23 @@ int main() {
   int frames = 0;
   std::string fps;
 
+  glm::vec3 c0(0 / 255.0, 1 / 255.0, 0 / 255.0);
+  glm::vec3 c1(37 / 255.0, 10 / 255.0, 78 / 255.0);
+  glm::vec3 c2(118 / 255.0, 25 / 255.0, 108 / 255.0);
+  glm::vec3 c3(230 / 255.0, 93 / 255.0, 37 / 255.0);
+  glm::vec3 c4(245 / 255.0, 216 / 255.0, 61 / 255.0);
+  glm::vec3 c5(250 / 255.0, 255 / 255.0, 166 / 255.0);
+  bool gradInverted = false;
+
+  bool wrapEdges = false;
+
   while (!glfwWindowShouldClose(window)) {
     float nowTime = glfwGetTime();
     float deltaTime = nowTime - lastTime;
     lastTime = nowTime;
     frames++;
 
-    limDT += deltaTime / updateLim;
+    limDT += deltaTime * simSpeed;
 
     while (limDT >= 1.0) {
       ca.update();
@@ -181,6 +190,9 @@ int main() {
       }
     }
 
+    ca.computeShader.use();
+    ca.computeShader.setBool("wrapEdges", wrapEdges);
+
     handleKeyboardInput(window, deltaTime, ca);
 
     glClear(GL_COLOR_BUFFER_BIT);
@@ -195,6 +207,13 @@ int main() {
     shader.setInt("voxelData", 0);
     shader.setMat4("view", camera.getViewMatrix());
     shader.setMat4("projection", camera.getProjectionMatrix());
+    shader.setVec3("c0", c0);
+    shader.setVec3("c1", c1);
+    shader.setVec3("c2", c2);
+    shader.setVec3("c3", c3);
+    shader.setVec3("c4", c4);
+    shader.setVec3("c5", c5);
+    shader.setBool("gradInverted", gradInverted);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -202,21 +221,42 @@ int main() {
     ImGui::Begin("Properties");
     ImGui::Text("FPS: %s", fps.c_str());
 
-    ImGui::Text("Camera (%.1f, %.1f, %.1f)", camera.position.x,
-                camera.position.y, camera.position.z);
-    ImGui::Text("  Speed");
-    ImGui::SameLine();
-    ImGui::DragFloat("##speed", &camera.movementSpeed, 0.1, 0.1, 0.0);
-    ImGui::Text("  Sensitivity");
-    ImGui::SameLine();
-    ImGui::DragFloat("##sens", &camera.mouseSensitivity, 0.005, 0.1, 0.0);
+    if (ImGui::CollapsingHeader("Simulation")) {
+      ImGui::Text("Wrap Edges");
+      ImGui::SameLine();
+      ImGui::Checkbox("##wrapEdges", &wrapEdges);
+      ImGui::Text("Simulation Speed");
+      ImGui::SameLine();
+      ImGui::DragFloat("##simspeed", &simSpeed, 1, 1, 300);
+      ImGui::Text("Grid Size");
+      ImGui::SameLine();
+      if (ImGui::DragInt3("##gridSize", &grid.x, 1, 1, 512)) {
+        resizePending = true;
+        resizeDebounceTimer = delay;
+      }
+    }
 
-    ImGui::Text("Grid");
-    ImGui::Text("  Size");
-    ImGui::SameLine();
-    if (ImGui::DragInt3("##gridSize", &grid.x, 1, 1, 512)) {
-      resizePending = true;
-      resizeDebounceTimer = delay;
+    if (ImGui::CollapsingHeader("Camera")) {
+      ImGui::Text("Position: %.1f, %.1f, %.1f", camera.position.x,
+                  camera.position.y, camera.position.z);
+      ImGui::Text("Speed");
+      ImGui::SameLine();
+      ImGui::DragFloat("##speed", &camera.movementSpeed, 0.2, 0.1, 1000);
+      ImGui::Text("Sensitivity");
+      ImGui::SameLine();
+      ImGui::DragFloat("##sens", &camera.mouseSensitivity, 0.005, 0, 5);
+    }
+
+    if (ImGui::CollapsingHeader("Depth Gradient")) {
+      ImGui::Text("Invert Gradient");
+      ImGui::SameLine();
+      ImGui::Checkbox("##gradInverted", &gradInverted);
+      ImGui::ColorEdit3("##0", &c0.x);
+      ImGui::ColorEdit3("##1", &c1.x);
+      ImGui::ColorEdit3("##2", &c2.x);
+      ImGui::ColorEdit3("##3", &c3.x);
+      ImGui::ColorEdit3("##4", &c4.x);
+      ImGui::ColorEdit3("##5", &c5.x);
     }
 
     ImGui::End();
