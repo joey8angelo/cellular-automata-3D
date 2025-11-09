@@ -22,6 +22,12 @@ class CellularAutomaton {
     initTextures();
   }
 
+  void resize(const glm::ivec3& s) {
+    size = s;
+    glDeleteTextures(2, textures);
+    initTextures();
+  }
+
   int getIdx(const glm::ivec3& p) {
     return p.z * size.y * size.x + p.y * size.x + p.x;
   }
@@ -51,7 +57,7 @@ class CellularAutomaton {
                        GL_R8UI);
     glBindImageTexture(1, textures[read], 0, GL_TRUE, 0, GL_READ_ONLY, GL_R8UI);
 
-    glDispatchCompute(size.x / 8, size.y / 8, size.z / 8);
+    glDispatchCompute((size.x + 7) / 8, (size.y + 7) / 8, (size.z + 7) / 8);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 

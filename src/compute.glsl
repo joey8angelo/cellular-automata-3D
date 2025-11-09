@@ -29,6 +29,12 @@ uint countNeighbors(ivec3 pos) {
 void main() {
     ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
     
+    if (pos.x >= imageSize(readTex).x ||
+        pos.y >= imageSize(readTex).y ||
+        pos.z >= imageSize(readTex).z) {
+        return;
+    }
+    
     uint state = imageLoad(readTex, pos).r;
     
     uint neighbors = countNeighbors(pos);

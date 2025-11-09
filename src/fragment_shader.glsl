@@ -34,22 +34,6 @@ float ray_aabb(vec3 bmin, vec3 bmax, vec3 o, vec3 d) {
     return 1e30f;
 }
 
-//float findNearest(vec3 o, vec3 d) {
-    //vec3 gridMin = vec3(0.0);
-    //vec3 gridMax = voxelSize;
-    //float entryT = ray_aabb(gridMin, gridMax, o, d);
-    //if (entryT == 1e30f) {
-        //return 1e30f;
-    //}
-    //
-    //uint voxelValue = texture(voxelData, vec3(0.0)).r;
-    //if (voxelValue != 0u) {
-        //return entryT;
-    //}
-
-    //return 1e30f;
-//}
-
 vec3 traverse(vec3 o, vec3 d) {
     vec3 gridMin = vec3(0.0);
     vec3 gridMax = voxelSize;
@@ -74,9 +58,9 @@ vec3 traverse(vec3 o, vec3 d) {
 
         if(voxelValue != 0u) {
             float t = entryT + (tmax[axis] - delta[axis]);
+            // depth coloring with purple tint
             float depth = t - entryT;
             return vec3(10 / (depth)) + vec3(0.05, 0.0, 0.1);
-            //return vec3(exp(-depth * 0.1)) + vec3(0.05, 0.0, 0.1);
         }
         
         if (tmax.x < tmax.y) {

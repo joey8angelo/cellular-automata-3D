@@ -19,13 +19,16 @@ class Camera {
   float mouseSensitivity;
   float zoom;
 
+  bool mouseEnabled;
+
   Camera(glm::vec3 startPosition, glm::vec3 startUp, float startYaw,
          float startPitch)
       : front(glm::vec3(0.0f, 0.0f, -1.0f)),
         resolution(glm::vec2(1, 1)),
         movementSpeed(40.5f),
         mouseSensitivity(0.1f),
-        zoom(45.0f) {
+        zoom(45.0f),
+        mouseEnabled(false) {
     position = startPosition;
     worldUp = startUp;
     yaw = startYaw;
@@ -43,6 +46,13 @@ class Camera {
     worldUp = glm::vec3(upX, upY, upZ);
     yaw = startYaw;
     pitch = startPitch;
+    updateCameraVectors();
+  }
+
+  void lookAt(const glm::vec3& target) {
+    front = glm::normalize(target - position);
+    yaw = glm::degrees(atan2(front.z, front.x));
+    pitch = glm::degrees(asin(front.y));
     updateCameraVectors();
   }
 
@@ -76,6 +86,8 @@ class Camera {
 
   void handleMouseMovement(float xoffset, float yoffset,
                            GLboolean constrainPitch = true) {
+    if (!mouseEnabled) return;
+
     xoffset *= mouseSensitivity;
     yoffset *= mouseSensitivity;
 

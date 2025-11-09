@@ -9,12 +9,16 @@
 #include "CellularAutomaton.hpp"
 #include "camera.hpp"
 
+#include <functional>
+
 // Update the cellular automaton 20 times per second
 const double updateLim = 1.0 / 20.0;
 
-const int grid = 256;
+glm::ivec3 grid(256, 256, 64);
+glm::ivec3 pgrid = grid;
 
-Camera camera({-grid * 2, grid / 2, grid / 2}, {0.0f, 1.0f, 0.0f}, 0.0f, 0.0f);
+Camera camera({-grid.x * 1.5, grid.y * 1.5, grid.z * 1.5}, {0.0, 1.0, 0.0}, 0.0,
+              0.0);
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, width, height);
@@ -26,7 +30,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
   camera.resolution = glm::vec2(width, height);
 }
 
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
   static float lastX = 400, lastY = 300;
   static bool firstMouse = true;
 
@@ -43,6 +47,18 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
   lastY = ypos;
 
   camera.handleMouseMovement(xoffset, yoffset);
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action,
+                           int mods) {
+  if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+    camera.mouseEnabled = !camera.mouseEnabled;
+    if (camera.mouseEnabled) {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    } else {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+  }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
@@ -66,6 +82,7 @@ GLFWwindow* initGLFWGlad() {
 
   GLFWwindow* window =
       glfwCreateWindow(800, 600, "Game of Life - 0 FPS", nullptr, nullptr);
+
   if (!window) {
     glfwTerminate();
     throw std::runtime_error("Failed to create GLFW window");
@@ -79,13 +96,24 @@ GLFWwindow* initGLFWGlad() {
     throw std::runtime_error("Failed to init GLAD");
   }
 
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glViewport(0, 0, 800, 600);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-  glfwSetCursorPosCallback(window, mouse_callback);
+  glfwSetCursorPosCallback(window, cursor_pos_callback);
+  glfwSetMouseButtonCallback(window, mouse_button_callback);
   glfwSetScrollCallback(window, scroll_callback);
 
   return window;
+}
+
+void handleKeyboardInput(GLFWwindow* window, float deltaTime,
+                         CellularAutomaton& ca) {
+  camera.handleKeyboardInput(window, deltaTime);
+  if (glfwGetKey(window, GLFW_KEY_R)) {
+    ca.reset();
+  }
+  if (glfwGetKey(window, GLFW_KEY_Q)) {
+    exit(0);
+  }
 }
 
 int main() {
@@ -94,7 +122,7 @@ int main() {
 
   Shader shader("../src/vertex_shader.glsl", "../src/fragment_shader.glsl");
   shader.use();
-  shader.setVec3("voxelSize", grid, grid, grid);
+  shader.setVec3("voxelSize", grid);
   glfwSetWindowUserPointer(window, &shader);
 
   float verts[] = {-1.0, 1.0, 0.0, -1.0, -1.0, 0.0, 1.0, -1.0, 0.0,
@@ -109,18 +137,27 @@ int main() {
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
 
-  CellularAutomaton ca({grid, grid, grid});
+  camera.lookAt(glm::vec3(grid.x / 2.0, grid.y / 2.0, grid.z / 2.0));
+
+  CellularAutomaton ca({grid.x, grid.y, grid.z});
+
+  float resizeDebounceTimer = 0.0;
+  const float delay = 0.5;
+  bool resizePending = false;
 
   float lastTime = glfwGetTime();
   float timer = lastTime;
   float limDT = 0;
   int frames = 0;
+  std::string fps;
 
   while (!glfwWindowShouldClose(window)) {
     float nowTime = glfwGetTime();
     float deltaTime = nowTime - lastTime;
-    limDT += deltaTime / updateLim;
     lastTime = nowTime;
+    frames++;
+
+    limDT += deltaTime / updateLim;
 
     while (limDT >= 1.0) {
       ca.update();
@@ -129,20 +166,22 @@ int main() {
 
     if (glfwGetTime() - timer > 1.0) {
       timer++;
-      glfwSetWindowTitle(
-          window,
-          ("Game of Life - " + std::to_string(frames) + " FPS").c_str());
-      std::cout << "FPS: " + std::to_string(frames) << std::endl;
+      fps = std::to_string(frames);
+      glfwSetWindowTitle(window, ("Game of Life - " + fps + " FPS").c_str());
       frames = 0;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_R)) {
-      ca.reset();
+    if (resizePending) {
+      resizeDebounceTimer -= deltaTime;
+      if (resizeDebounceTimer <= 0.0) {
+        resizePending = false;
+        ca.resize(grid);
+        shader.use();
+        shader.setVec3("voxelSize", grid);
+      }
     }
 
-    frames++;
-
-    camera.handleKeyboardInput(window, deltaTime);
+    handleKeyboardInput(window, deltaTime, ca);
 
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -153,15 +192,33 @@ int main() {
     shader.use();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, ca.currentTexture());
+    shader.setInt("voxelData", 0);
     shader.setMat4("view", camera.getViewMatrix());
     shader.setMat4("projection", camera.getProjectionMatrix());
-    shader.setInt("voxelData", 0);
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    ImGui::Begin("window");
-    ImGui::Text("hello world");
+    ImGui::Begin("Properties");
+    ImGui::Text("FPS: %s", fps.c_str());
+
+    ImGui::Text("Camera (%.1f, %.1f, %.1f)", camera.position.x,
+                camera.position.y, camera.position.z);
+    ImGui::Text("  Speed");
+    ImGui::SameLine();
+    ImGui::DragFloat("##speed", &camera.movementSpeed, 0.1, 0.1, 0.0);
+    ImGui::Text("  Sensitivity");
+    ImGui::SameLine();
+    ImGui::DragFloat("##sens", &camera.mouseSensitivity, 0.005, 0.1, 0.0);
+
+    ImGui::Text("Grid");
+    ImGui::Text("  Size");
+    ImGui::SameLine();
+    if (ImGui::DragInt3("##gridSize", &grid.x, 1, 1, 512)) {
+      resizePending = true;
+      resizeDebounceTimer = delay;
+    }
+
     ImGui::End();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -169,6 +226,13 @@ int main() {
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+
+  glDeleteVertexArrays(1, &VAO);
+  glDeleteBuffers(1, &VBO);
 
   glfwDestroyWindow(window);
   glfwTerminate();
