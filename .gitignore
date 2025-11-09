@@ -16,3 +16,5 @@ CMakeUserPresets.json
 
 GameOfLife
 GameOfLife_debug
+
+imgui.ini
