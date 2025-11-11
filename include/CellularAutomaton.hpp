@@ -11,7 +11,6 @@ class CellularAutomaton {
  private:
   const char* computePath;
   GLuint textures[2];
-  GLuint buffer;
   short read, write;
   glm::ivec3 size;
 
