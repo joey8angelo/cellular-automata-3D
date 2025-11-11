@@ -29,6 +29,11 @@ set(SRC_FILES
   src/imgui/imgui_impl_opengl3.cpp
 )
 
+configure_file(
+  "${CMAKE_SOURCE_DIR}/include/config.h.in"
+  "${CMAKE_SOURCE_DIR}/include/config.h"
+)
+
 add_executable(${PROJECT_NAME} ${SRC_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC "source")
 target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw)

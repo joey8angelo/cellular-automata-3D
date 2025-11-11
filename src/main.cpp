@@ -1,15 +1,14 @@
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <shader.hpp>
-#include "CellularAutomaton.hpp"
-#include "camera.hpp"
-
-#include <functional>
+#include <CellularAutomaton.hpp>
+#include <camera.hpp>
+#include <config.h>
 
 glm::ivec3 grid(256, 256, 256);
 glm::ivec3 pgrid = grid;
@@ -119,7 +118,10 @@ int main() {
 
   float simSpeed = 20;
 
-  Shader shader("../src/vertex_shader.glsl", "../src/fragment_shader.glsl");
+  std::filesystem::path base(PROJECT_SOURCE_DIR);
+
+  Shader shader((base / "src" / "vertex_shader.glsl").c_str(),
+                (base / "src" / "fragment_shader.glsl").c_str());
   shader.use();
   shader.setVec3("voxelSize", grid);
   glfwSetWindowUserPointer(window, &shader);

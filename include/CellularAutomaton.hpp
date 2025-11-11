@@ -1,4 +1,8 @@
-#include "computeShader.hpp"
+#pragma once
+
+#include <computeShader.hpp>
+#include <config.h>
+#include <filesystem>
 
 bool randomProb(float probability) {
   return static_cast<float>(rand()) / static_cast<float>(RAND_MAX) <
@@ -9,7 +13,7 @@ const float pr = 0.499f;
 
 class CellularAutomaton {
  private:
-  const char* computePath;
+  std::filesystem::path computePath;
   GLuint textures[2];
   short read, write;
   glm::ivec3 size;
@@ -17,9 +21,10 @@ class CellularAutomaton {
  public:
   ComputeShader computeShader;
   CellularAutomaton(const glm::ivec3& size)
-      : computePath("../src/compute.glsl"),
+      : computePath(std::filesystem::path(PROJECT_SOURCE_DIR) / "src" /
+                    "compute.glsl"),
         size(size),
-        computeShader(computePath) {
+        computeShader(computePath.c_str()) {
     initTextures();
   }
 
